@@ -1,8 +1,12 @@
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-import os
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import click
+import sys
+import os
 from typing import List
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -21,8 +25,13 @@ def extract_pdf_information(input_directory, questions_file, openai_api_key):
     """
     Extract information from PDF files using provided questions and API key.
     """
+    click.echo(f"Loading PDF files from '{input_directory}'...")
     pdf_documents, filenames = load_pdf_files(input_directory)
+    click.echo(f"Loaded {len(pdf_documents)} PDF files.")
+
+    click.echo(f"Loading questions from '{questions_file}'...")
     questions_list = load_questions_from_file(questions_file)
+    click.echo(f"Loaded {len(questions_list)} questions.")
 
     MAX_TOKENS = 512  # Maximum number of tokens allowed by the model
     chunk_size = MAX_TOKENS - 100  # Subtracting a buffer of tokens for safety
@@ -33,6 +42,7 @@ def extract_pdf_information(input_directory, questions_file, openai_api_key):
         """
         Split the PDF documents into smaller chunks to handle the maximum token limit.
         """
+        click.echo(f"Splitting PDF '{filenames[pdf_documents.index(pdf)]}'...")
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, 
                                                         chunk_overlap=chunk_overlap)
         document_chunks.extend(text_splitter.split_documents(pdf))
@@ -42,6 +52,7 @@ def extract_pdf_information(input_directory, questions_file, openai_api_key):
         """
         Create embeddings for the documents and build a vector store for efficient searching.
         """
+        click.echo(f"Creating embeddings for document chunk {doc_index + 1}...")
         embeddings = HuggingFaceEmbeddings(model_name='paraphrase-multilingual-MiniLM-L12-v2')
         document_search = Chroma.from_documents([document], embeddings)
 
@@ -59,11 +70,13 @@ def extract_pdf_information(input_directory, questions_file, openai_api_key):
             """
             Process the questions and generate answers using the chain.
             """
+            click.echo(f"Processing question '{question}'...")
             result = {'filename': filenames[doc_index], 'question': question}
             answer = chain.invoke({'question': f'{question}'}, return_only_outputs=True)
             result['answer'] = answer['answer']
             result['source'] = answer['sources']
             results.append(result)
+
     save_results_to_csv(results)
 
 def load_pdf_files(input_directory: str) -> List[str]:
